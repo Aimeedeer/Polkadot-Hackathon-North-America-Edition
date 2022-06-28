@@ -1,5 +1,5 @@
 [package]
-name = "uniswap_v2_psp22"
+name = "swap_contracts"
 version = "0.1.0"
 authors = ["[your_name] <[your_email]>"]
 edition = "2021"
@@ -19,7 +19,7 @@ scale-info = { version = "2", default-features = false, features = ["derive"], o
 openbrush = { version = "~2.0.0", default-features = false, features = ["psp22"] }
 
 [lib]
-name = "uniswap_v2_psp22"
+name = "swap_contracts"
 path = "lib.rs"
 crate-type = [
 	# Used for normal contract Wasm blobs.

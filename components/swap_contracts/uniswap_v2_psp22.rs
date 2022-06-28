@@ -1,8 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(min_specialization)]
 
 #[openbrush::contract]
-mod uniswap_v2_psp22 {
+pub mod uniswap_v2_psp22 {
     use ink_prelude::string::String;
     use ink_prelude::vec::Vec;
     use ink_storage::traits::SpreadAllocate;

@@ -2,16 +2,15 @@
 
 #[openbrush::contract]
 pub mod uniswap_v2_pair {
+    use ink_prelude::string::String;
     use ink_prelude::vec::Vec;
     use ink_storage::traits::SpreadAllocate;
 
     use crate::math;
-    use crate::uniswap_v2_psp22::uniswap_v2_psp22::UniswapV2Psp22;
     use openbrush::contracts::psp22::extensions::{
         burnable::*, flashmint::*, metadata::*, mintable::*,
     };
-    use openbrush::contracts::psp22::psp22_external;
-    use openbrush::contracts::psp22::PSP22;
+    use openbrush::contracts::psp22::*;
 
     // todo: const SELECTOR;
     // #[ink(selector = 0xCAFEBABE)]
@@ -30,6 +29,7 @@ pub mod uniswap_v2_pair {
         InsufficientOoutputAmount,
         InsufficientLiquidity,
         InsufficientLiquidityMinted,
+        InsufficientLiquidityBurned,
         InvalidTo,
         UniswapV2KError,
     }
@@ -37,11 +37,15 @@ pub mod uniswap_v2_pair {
     pub type Result<T> = core::result::Result<T, PairError>;
 
     #[openbrush::wrapper]
-    type PSP22Ref = dyn PSP22 + PSP22Mintable;
+    type PSP22Ref = dyn PSP22 + PSP22Mintable + PSP22Burnable;
 
     #[ink(storage)]
-    #[derive(SpreadAllocate)]
+    #[derive(Default, SpreadAllocate, PSP22Storage, PSP22MetadataStorage)]
     pub struct UniswapV2Pair {
+        #[PSP22StorageField]
+        psp22: PSP22Data,
+        #[PSP22MetadataStorageField]
+        metadata: PSP22MetadataData,
         pub factory: AccountId,
         pub token_0: AccountId,
         pub token_1: AccountId,
@@ -52,6 +56,12 @@ pub mod uniswap_v2_pair {
         reserve_1: Balance,
         block_timestamp_last: u64, //uinit32
     }
+
+    impl PSP22 for UniswapV2Pair {}
+    impl PSP22Metadata for UniswapV2Pair {}
+    impl PSP22Mintable for UniswapV2Pair {}
+    impl PSP22Burnable for UniswapV2Pair {}
+    impl FlashLender for UniswapV2Pair {}
 
     #[ink(event)]
     pub struct Approval {
@@ -109,8 +119,21 @@ pub mod uniswap_v2_pair {
 
     impl UniswapV2Pair {
         #[ink(constructor)]
-        pub fn new(token_0: AccountId, token_1: AccountId) -> Self {
+        pub fn new(
+            name: Option<String>,
+            symbol: Option<String>,
+            decimal: u8,
+            total_supply: Balance,
+            token_0: AccountId,
+            token_1: AccountId,
+        ) -> Self {
             ink_lang::utils::initialize_contract(|instance: &mut Self| {
+                instance.metadata.name = name;
+                instance.metadata.symbol = symbol;
+                instance.metadata.decimals = decimal;
+                instance
+                    ._mint(instance.env().caller(), total_supply)
+                    .expect("Should mint total_supply");
                 instance.factory = Self::env().caller();
                 instance.token_0 = token_0;
                 instance.token_1 = token_1;
@@ -133,7 +156,9 @@ pub mod uniswap_v2_pair {
             Ok((self.reserve_0, self.reserve_1, self.block_timestamp_last))
         }
 
-        fn mint(&mut self, to: AccountId) -> Result<Balance> {
+        // todo: lock check?
+        // function mint(address to) external lock returns (uint liquidity) {
+        pub fn mint(&mut self, to: AccountId) -> Result<Balance> {
             let (reserve_0, reserve_1, _) = self.get_reserves()?;
 
             let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
@@ -197,7 +222,63 @@ pub mod uniswap_v2_pair {
             Ok(liquidity)
         }
 
-        fn swap(
+        // todo: lock check?
+        // function burn(address to) external lock returns (uint amount0, uint amount1) {
+        pub fn burn(&mut self, to: AccountId) -> Result<(Balance, Balance)> {
+            let (reserve_0, reserve_1, _) = self.get_reserves()?;
+
+            let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
+            let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
+
+            // get liquidity right?
+            let liquidity =
+                PSP22Ref::balance_of(&Self::env().account_id(), Self::env().account_id());
+
+            let is_fee_on = self.mint_fee(reserve_0, reserve_1);
+            let total_supply = PSP22Ref::total_supply(&to);
+
+            let amount_0 = liquidity
+                .checked_mul(balance_0)
+                .expect("overflow")
+                .checked_div(total_supply)
+                .expect("underflow");
+            let amount_1 = liquidity
+                .checked_mul(balance_1)
+                .expect("overflow")
+                .checked_div(total_supply)
+                .expect("underflow");
+
+            if amount_0 <= 0 || amount_1 <= 0 {
+                return Err(PairError::InsufficientLiquidityBurned);
+            }
+
+            PSP22Ref::burn(&Self::env().account_id(), to, liquidity).expect("PSP22 burn error");
+
+            self.safe_transfer(self.token_0, to, amount_0);
+            self.safe_transfer(self.token_1, to, amount_1);
+
+            let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
+            let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
+
+            self.update(balance_0, balance_1, reserve_0, reserve_1)?;
+
+            if is_fee_on {
+                self.k_last = reserve_0.checked_mul(reserve_1).expect("overflow");
+            }
+
+            Self::env().emit_event(Burn {
+                sender: Self::env().caller(),
+                to,
+                amount_0,
+                amount_1,
+            });
+
+            Ok((amount_0, amount_1))
+        }
+
+        // todo: lock check?
+        // function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
+        pub fn swap(
             &mut self,
             amount_out_0: Balance,
             amount_out_1: Balance,
@@ -276,6 +357,32 @@ pub mod uniswap_v2_pair {
                 amount_out_0,
                 amount_out_1,
             });
+
+            Ok(())
+        }
+
+        // todo:
+        // function skim(address to) external lock {
+        pub fn skim(&self, to: AccountId) -> Result<()> {
+            let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
+            let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
+
+            let amount_0 = balance_0.checked_sub(self.reserve_0).expect("underflow");
+            let amount_1 = balance_1.checked_sub(self.reserve_1).expect("underflow");
+
+            self.safe_transfer(self.token_0, to, amount_0)?;
+            self.safe_transfer(self.token_1, to, amount_1)?;
+
+            Ok(())
+        }
+
+        // todo:
+        // function sync() external lock {
+        pub fn sync(&self) -> Result<()> {
+            let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
+            let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
+
+            self.update(balance_0, balance_1, self.reserve_0, self.reserve_1)?;
 
             Ok(())
         }

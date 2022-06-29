@@ -3,4 +3,3 @@
 
 mod math;
 mod uniswap_v2_pair;
-mod uniswap_v2_psp22;

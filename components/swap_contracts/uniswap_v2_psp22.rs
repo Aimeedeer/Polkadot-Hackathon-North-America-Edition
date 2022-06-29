@@ -6,9 +6,9 @@ pub mod uniswap_v2_psp22 {
     use ink_prelude::vec::Vec;
     use ink_storage::traits::SpreadAllocate;
 
-    use openbrush::contracts::psp22::extensions::burnable::*;
-    use openbrush::contracts::psp22::extensions::metadata::*;
-    use openbrush::contracts::psp22::extensions::mintable::*;
+    use openbrush::contracts::psp22::extensions::{
+        burnable::*, flashmint::*, metadata::*, mintable::*,
+    };
     use openbrush::contracts::psp22::*;
 
     #[ink(storage)]
@@ -24,6 +24,7 @@ pub mod uniswap_v2_psp22 {
     impl PSP22Metadata for UniswapV2Psp22 {}
     impl PSP22Mintable for UniswapV2Psp22 {}
     impl PSP22Burnable for UniswapV2Psp22 {}
+    impl FlashLender for UniswapV2Psp22 {}
 
     impl UniswapV2Psp22 {
         #[ink(constructor)]

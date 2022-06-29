@@ -5,7 +5,11 @@ pub mod uniswap_v2_pair {
     use ink_prelude::vec::Vec;
     use ink_storage::traits::SpreadAllocate;
 
+    use crate::math;
     use crate::uniswap_v2_psp22::uniswap_v2_psp22::UniswapV2Psp22;
+    use openbrush::contracts::psp22::extensions::{
+        burnable::*, flashmint::*, metadata::*, mintable::*,
+    };
     use openbrush::contracts::psp22::psp22_external;
     use openbrush::contracts::psp22::PSP22;
 
@@ -25,6 +29,7 @@ pub mod uniswap_v2_pair {
         InsufficientInputAmount,
         InsufficientOoutputAmount,
         InsufficientLiquidity,
+        InsufficientLiquidityMinted,
         InvalidTo,
         UniswapV2KError,
     }
@@ -32,7 +37,7 @@ pub mod uniswap_v2_pair {
     pub type Result<T> = core::result::Result<T, PairError>;
 
     #[openbrush::wrapper]
-    type PSP22Ref = dyn PSP22;
+    type PSP22Ref = dyn PSP22 + PSP22Mintable;
 
     #[ink(storage)]
     #[derive(SpreadAllocate)]
@@ -67,6 +72,24 @@ pub mod uniswap_v2_pair {
     }
 
     #[ink(event)]
+    pub struct Mint {
+        #[ink(topic)]
+        sender: AccountId, // address indexed sender
+        amount_0: Balance,
+        amount_1: Balance,
+    }
+
+    #[ink(event)]
+    pub struct Burn {
+        #[ink(topic)]
+        sender: AccountId, // address indexed sender
+        #[ink(topic)]
+        to: AccountId, // address indexed to
+        amount_0: Balance,
+        amount_1: Balance,
+    }
+
+    #[ink(event)]
     pub struct Swap {
         #[ink(topic)]
         sender: AccountId, // address indexed sender
@@ -76,6 +99,12 @@ pub mod uniswap_v2_pair {
         amount_in_1: Balance,
         amount_out_0: Balance,
         amount_out_1: Balance,
+    }
+
+    #[ink(event)]
+    pub struct Sync {
+        reserve_0: Balance,
+        reserve_1: Balance,
     }
 
     impl UniswapV2Pair {
@@ -102,6 +131,70 @@ pub mod uniswap_v2_pair {
         #[ink(message)]
         pub fn get_reserves(&self) -> Result<(Balance, Balance, u64)> {
             Ok((self.reserve_0, self.reserve_1, self.block_timestamp_last))
+        }
+
+        fn mint(&mut self, to: AccountId) -> Result<Balance> {
+            let (reserve_0, reserve_1, _) = self.get_reserves()?;
+
+            let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
+            let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
+
+            let amount_0 = balance_0.checked_sub(reserve_0).expect("underflow");
+            let amount_1 = balance_1.checked_sub(reserve_1).expect("underflow");
+
+            let is_fee_on = self.mint_fee(reserve_0, reserve_1);
+
+            let total_supply = PSP22Ref::total_supply(&to);
+
+            let liquidity: Balance;
+            if total_supply == 0 {
+                let _liquidity = math::sqrt(amount_0.checked_mul(amount_1).expect("overflow"));
+                let _liquidity = _liquidity
+                    .checked_sub(MINIMUM_LIQUIDITY)
+                    .expect("underflow");
+
+                liquidity = _liquidity;
+
+                // todo: set up address(0)
+                // _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
+            } else {
+                let _liquidity = math::min(
+                    amount_0
+                        .checked_mul(total_supply)
+                        .expect("overflow")
+                        .checked_div(reserve_0)
+                        .expect("underflow"),
+                    amount_1
+                        .checked_mul(total_supply)
+                        .expect("overflow")
+                        .checked_div(reserve_1)
+                        .expect("underflow"),
+                );
+
+                liquidity = _liquidity
+            }
+
+            if liquidity <= 0 {
+                return Err(PairError::InsufficientLiquidityMinted);
+            }
+
+            PSP22Ref::mint(&Self::env().account_id(), to, liquidity).expect("PSP22 mint error");
+
+            self.update(balance_0, balance_1, reserve_0, reserve_1)?;
+
+            // todo
+            // reserve_0 and reserve_1 are up-to-date??
+            if is_fee_on {
+                self.k_last = reserve_0.checked_mul(reserve_1).expect("overflow");
+            }
+
+            Self::env().emit_event(Mint {
+                sender: Self::env().caller(),
+                amount_0,
+                amount_1,
+            });
+
+            Ok(liquidity)
         }
 
         fn swap(
@@ -198,6 +291,10 @@ pub mod uniswap_v2_pair {
             reserve_0: Balance,
             reserve_1: Balance,
         ) -> Result<()> {
+            todo!()
+        }
+
+        fn mint_fee(&self, reserve_0: Balance, reserve_1: Balance) -> bool {
             todo!()
         }
     }

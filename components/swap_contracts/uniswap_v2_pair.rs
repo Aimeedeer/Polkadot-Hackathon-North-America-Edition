@@ -12,6 +12,8 @@ pub mod uniswap_v2_pair {
     };
     use openbrush::contracts::psp22::*;
 
+    use swap_traits::uniswap_v2_callee::IUniswapV2Callee;
+
     // todo: const SELECTOR;
     // #[ink(selector = 0xCAFEBABE)]
     // bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
@@ -182,6 +184,8 @@ pub mod uniswap_v2_pair {
 
                 // todo: set up address(0)
                 // _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
+                PSP22Ref::mint(&Self::env().account_id(), to, MINIMUM_LIQUIDITY)
+                    .expect("PSP22 mint error");
             } else {
                 let _liquidity = math::min(
                     amount_0
@@ -306,7 +310,7 @@ pub mod uniswap_v2_pair {
                 self.safe_transfer(self.token_1, to, amount_out_1)?;
             }
 
-            // todo
+            // todo: CalleeRef::uniswap_v2_call(&Self::env().account_id(), Self::env().caller(), amount_out_0, amount_out_1, data);
             // if (data.length > 0) IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
 
             let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());

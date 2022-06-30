@@ -41,7 +41,6 @@ pub enum UniswapFactoryError {
 
 pub type UniswapFactoryResult<T> = core::result::Result<T, UniswapFactoryError>;
 
-
 #[ink::trait_definition]
 pub trait IUniswapV2Factory {
     #[ink(message)]

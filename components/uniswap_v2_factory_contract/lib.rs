@@ -3,11 +3,10 @@
 use ink_lang as ink;
 
 #[ink::contract]
-mod uniswap_v2_factory{
+mod uniswap_v2_factory {
     use ink_lang as ink;
     use ink_storage::{traits::SpreadAllocate, Mapping};
     // pub use swap_traits::{IUniswapV2Factory, UniswapFactoryError, UniswapFactoryResult};
-
 
     #[ink::trait_definition]
     pub trait IUniswapV2Factory {
@@ -36,8 +35,6 @@ mod uniswap_v2_factory{
         fn set_fee_to_setter(&mut self, address: AccountId);
     }
 
-
-
     #[derive(Default)]
     #[ink(storage)]
     #[derive(SpreadAllocate)]
@@ -46,10 +43,8 @@ mod uniswap_v2_factory{
         fee_to_setter: AccountId,
         // get_pair: Mapping<AccountId, Mapping<AccountId, AccountId>>,
         // all_pairs: AccountId,
-        fees: Balance
-
+        fees: Balance,
     }
-
 
     #[ink(event)]
     pub struct PairCreated {
@@ -58,12 +53,10 @@ mod uniswap_v2_factory{
         #[ink(topic)]
         token1: AccountId,
         #[ink(topic)]
-        pair: Balance
+        pair: Balance,
     }
 
     impl UniswapV2Factory {
-        
-
         #[ink(constructor)]
         pub fn new(_fees: Balance) -> Self {
             // Sets fees to zero if not in valid range
@@ -72,34 +65,28 @@ mod uniswap_v2_factory{
                 ..Default::default()
             }
         }
-
     }
-  
-    
 
     impl IUniswapV2Factory for UniswapV2Factory {
-        
         // #[ink(message)]                                                 //-> UniswapFactoryResult<()>
         // fn create_pair(&mut self, token_a: AccountId, token_b: AccountId)  {
-                // if token_a != token_b {
-                //     // Conditional Operator (? :)
-                //     // The conditional operator first evaluates an expression for a true or false value and then executes 
-                //     // one of the two given statements depending upon the result of the evaluation.
+        // if token_a != token_b {
+        //     // Conditional Operator (? :)
+        //     // The conditional operator first evaluates an expression for a true or false value and then executes
+        //     // one of the two given statements depending upon the result of the evaluation.
 
-                //     if token_b > token_a {
-                //         let token0: AccountId = token_a;
-                //         let token1: AccountId = token_b;
-                //     }
-                //     else {
-                //         let token0: AccountId = token_b;
-                //         let token1: AccountId = token_a;
-                //     }
-                    
-                       
-                    
-                //     todo!();
-                    
-                // }
+        //     if token_b > token_a {
+        //         let token0: AccountId = token_a;
+        //         let token1: AccountId = token_b;
+        //     }
+        //     else {
+        //         let token0: AccountId = token_b;
+        //         let token1: AccountId = token_a;
+        //     }
+
+        //     todo!();
+
+        // }
         //         todo!();
         // }
         // #[ink(message)]
@@ -133,7 +120,7 @@ mod uniswap_v2_factory{
         }
 
         #[ink(message)]
-        fn get_pair(&self, toekn_a: AccountId, token_b: AccountId) -> AccountId{
+        fn get_pair(&self, toekn_a: AccountId, token_b: AccountId) -> AccountId {
             todo!();
         }
 
@@ -141,10 +128,5 @@ mod uniswap_v2_factory{
         fn all_pairs(&self, log_value: u64) -> AccountId {
             todo!();
         }
-
     }
-
-    
-    
-      
 }

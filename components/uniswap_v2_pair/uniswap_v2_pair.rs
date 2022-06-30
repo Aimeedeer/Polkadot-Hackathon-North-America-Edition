@@ -316,13 +316,19 @@ pub mod uniswap_v2_pair {
             let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
             let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
 
-            let amount_in_0 = if balance_0 > reserve_0.checked_sub(amount_out_0).expect("underflow") {
-                balance_0.checked_sub(reserve_0.checked_sub(amount_out_0).expect("underflow")).expect("underflow")
+            let amount_in_0 = if balance_0 > reserve_0.checked_sub(amount_out_0).expect("underflow")
+            {
+                balance_0
+                    .checked_sub(reserve_0.checked_sub(amount_out_0).expect("underflow"))
+                    .expect("underflow")
             } else {
                 0
             };
-            let amount_in_1 = if balance_1 > reserve_1.checked_sub(amount_out_1).expect("underflow") {
-                balance_1.checked_sub(reserve_1.checked_sub(amount_out_1).expect("underflow")).expect("underflow")
+            let amount_in_1 = if balance_1 > reserve_1.checked_sub(amount_out_1).expect("underflow")
+            {
+                balance_1
+                    .checked_sub(reserve_1.checked_sub(amount_out_1).expect("underflow"))
+                    .expect("underflow")
             } else {
                 0
             };

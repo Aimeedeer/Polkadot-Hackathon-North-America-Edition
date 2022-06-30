@@ -192,12 +192,12 @@ pub mod uniswap_v2_pair {
                         .checked_mul(total_supply)
                         .expect("overflow")
                         .checked_div(reserve_0)
-                        .expect("underflow"),
+                        .expect("overflow"),
                     amount_1
                         .checked_mul(total_supply)
                         .expect("overflow")
                         .checked_div(reserve_1)
-                        .expect("underflow"),
+                        .expect("overflow"),
                 );
 
                 liquidity = _liquidity
@@ -245,12 +245,12 @@ pub mod uniswap_v2_pair {
                 .checked_mul(balance_0)
                 .expect("overflow")
                 .checked_div(total_supply)
-                .expect("underflow");
+                .expect("overflow");
             let amount_1 = liquidity
                 .checked_mul(balance_1)
                 .expect("overflow")
                 .checked_div(total_supply)
-                .expect("underflow");
+                .expect("overflow");
 
             if amount_0 <= 0 || amount_1 <= 0 {
                 return Err(PairError::InsufficientLiquidityBurned);
@@ -316,13 +316,13 @@ pub mod uniswap_v2_pair {
             let balance_0 = PSP22Ref::balance_of(&self.token_0, Self::env().account_id());
             let balance_1 = PSP22Ref::balance_of(&self.token_1, Self::env().account_id());
 
-            let amount_in_0 = if balance_0 > reserve_0 - amount_out_0 {
-                balance_0 - (reserve_0 - amount_out_0)
+            let amount_in_0 = if balance_0 > reserve_0.checked_sub(amount_out_0).expect("underflow") {
+                balance_0.checked_sub(reserve_0.checked_sub(amount_out_0).expect("underflow")).expect("underflow")
             } else {
                 0
             };
-            let amount_in_1 = if balance_1 > reserve_1 - amount_out_1 {
-                balance_1 - (reserve_1 - amount_out_1)
+            let amount_in_1 = if balance_1 > reserve_1.checked_sub(amount_out_1).expect("underflow") {
+                balance_1.checked_sub(reserve_1.checked_sub(amount_out_1).expect("underflow")).expect("underflow")
             } else {
                 0
             };
